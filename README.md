@@ -43,7 +43,7 @@ P: pressure (this array is checkpointed)
 
 HOW to Build & Run
 ------------
-Build binary:
+Build binary:  
 
     $ ./paramset.sh <Grid size> <X> <Y> <Z> <Checkpoint dir>
     $ make
@@ -51,8 +51,8 @@ Build binary:
 * `<Grid size>`           : XS (32x32x64), S  (64x64x128), M  (128x128x256), L  (256x256x512), XL (512x512x1024)
 * `<X> <Y> <Z>`           : Partition size
 * `Checkpoint dir`: Path to Checkpoint/Restart directory
-
-Run:
+  
+Run:  
     $  mpirun -np * ./bmt <Restart #> <Checkpoint interval (steps)>
 * `Restart #`:  Checkpiont id at which bmt starts. 0 indicates run without restart
 * `Checkpoint interval (steps)`: # of Steps to skip checkpointing . 0 indicates no checkpoints.
