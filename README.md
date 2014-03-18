@@ -53,6 +53,7 @@ Build binary:
 * `Checkpoint dir`: Path to Checkpoint/Restart directory
   
 Run:  
+  
     $  mpirun -np * ./bmt <Restart #> <Checkpoint interval (steps)>
 * `Restart #`:  Checkpiont id at which bmt starts. 0 indicates run without restart
 * `Checkpoint interval (steps)`: # of Steps to skip checkpointing . 0 indicates no checkpoints.
