@@ -3,6 +3,7 @@
 ndx=$2
 ndy=$3
 ndz=$4
+cdir=$5
 #
 case "$1" in
     ssmall | XS )
@@ -27,7 +28,7 @@ case "$1" in
        mz0=1025 ;;
     * )
        echo ' Invalid argument'
-       echo ' Usage:: % program <Grid size> <ID> <JD> <KD>'
+       echo ' Usage:: % program <Grid size> <ID> <JD> <KD> <Checkpoint dir>'
        echo '         Grid size= XS (32x32x64)'
        echo '                    S  (64x64x128)'
        echo '                    M  (128x128x256)'
@@ -55,6 +56,7 @@ echo ' */' >> param.h
 echo '#define MX0     '$mx0 >> param.h
 echo '#define MY0     '$my0 >> param.h
 echo '#define MZ0     '$mz0 >> param.h
+echo '#define CHECKPOINT_DIR  "'$cdir'"' >> param.h
 #
 if [ $ndx -eq 1 ]
 then

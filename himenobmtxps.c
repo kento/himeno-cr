@@ -36,9 +36,16 @@
  P: pressure
 ********************************************************************/
 
+#include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "mpi.h"
 #include "param.h"
+#include "himenobmtxps_io.h"
+#include "himenobmtxps_err.h"
 
 float jacobi(int);
 int initmax(int,int,int);
@@ -69,6 +76,18 @@ static int npx[2],npy[2],npz[2];
 MPI_Comm     mpi_comm_cart;
 MPI_Datatype ijvec,ikvec,jkvec;
 
+/* ===========================
+ * Added for checkpiont/restart
+ * ===========================*/
+int  cfd;
+char cfile[128];
+int restart_id = 0;
+int interval = 0;
+void restart(int restart_id);
+void checkpoint(int step);
+/* ===========================*/
+  
+
 int
 main(int argc,char *argv[])
 {
@@ -89,6 +108,32 @@ main(int argc,char *argv[])
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &npe);
   MPI_Comm_rank(MPI_COMM_WORLD, &id);
+
+  hime_err_init(id);
+  if (argc != 3) {
+    if (id == 0) {
+      printf("./bmt <Restart #> <Checkpoint interval (steps)>\n");
+      printf("\n");
+      printf("   Restart #:\n");
+      printf("      Checkpiont id at which bmt starts\n");
+      printf("   Checkpoint interval (steps):\n");
+      printf("      # of Steps to skip checkpointing\n");
+      printf("");
+    }
+    MPI_Finalize();
+    exit(0);
+  }
+  
+  restart_id = atoi(argv[1]);
+  interval   = atoi(argv[2]);
+
+  hime_dbgi(0, "Checkpoint directory: %s", CHECKPOINT_DIR);
+  hime_dbgi(0, "Checkpoint interval:  %d", interval);
+
+  if (restart_id > 0) {
+    hime_dbgi(0, "Restart ID:  %d", restart_id);
+    restart(restart_id);
+  }  
 
   initcomm(ndx,ndy,ndz);
   it= initmax(mx,my,mz);
@@ -163,9 +208,35 @@ main(int argc,char *argv[])
            mflops(nn,cpu,flop)/82.84);
   }
 
+
   MPI_Finalize();
   
   return (0);
+}
+
+void restart(int restart_id)
+{
+  sprintf(cfile, "%s/checkpoint.%d.%d", CHECKPOINT_DIR, id, restart_id);
+  cfd = hime_open(cfile, O_RDONLY, S_IRUSR | S_IWUSR);
+  hime_dbgi(0, "Restart start: restart_id = %d", restart_id);
+  hime_read(cfile, cfd, p, MIMAX * MJMAX * MKMAX * sizeof(float));
+  hime_close(cfile, cfd);
+  MPI_Barrier(MPI_COMM_WORLD);
+  hime_dbgi(0, "Restart end  : restart_id = %d", restart_id);
+}
+
+
+void checkpoint(int step)
+{
+  if (step % interval == 0) {
+    sprintf(cfile, "%s/checkpoint.%d.%d", CHECKPOINT_DIR, id, step);
+    cfd = hime_open(cfile, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    hime_dbgi(0, "Checkpoint start: step = %d", step);
+    hime_write(cfile, cfd, p, MIMAX * MJMAX * MKMAX * sizeof(float));
+    hime_close(cfile, cfd);
+    MPI_Barrier(MPI_COMM_WORLD);
+    hime_dbgi(0, "Checkpoint end  : step = %d", step);
+  }
 }
 
 double
@@ -270,6 +341,8 @@ jacobi(int nn)
                   MPI_FLOAT,
                   MPI_SUM,
                   MPI_COMM_WORLD);
+
+    checkpoint(n);
   } /* end n loop */
 
   return(gosa);

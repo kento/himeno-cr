@@ -1,3 +1,4 @@
+
 int hime_open(const char* file, int flags, mode_t  mode);
 int hiem_close(const char* file, int fd);
 ssize_t hiem_write(const char* file, int fd, const void* buf, size_t size);
