@@ -1,240 +1,66 @@
 
-RDMA Communication Runtime
+Himemo Benchmark (with Checkpoint/Restart)
 ==========================
 
-This runtime is a client/server model communication runtime over infiniband interconntects.
-The runtime is develeped by using ibverbs.
+This code implements a himen benchmark with simple checkpoint/restart.
 
-
-
-Directly Structure
+About himeno benchmark
 ------------------
-* libibtl  
-    * src    : Directory for source codes  
-    * include: Directory for header files  
-    * example: Directory for example codes  
+This benchmark test program is measuring a cpu performance
+of floating point operation by a Poisson equation solver.
 
+If you have any question, please ask me via email.
+written by Ryutaro HIMENO, November 26, 2001.
+Version 3.0
+    ----------------------------------------------
+    Ryutaro Himeno, Dr. of Eng.
+    Head of Computer Information Division,
+    RIKEN (The Institute of Pysical and Chemical Research)
+    Email : himeno@postman.riken.go.jp
+    ---------------------------------------------------------------
+You can adjust the size of this benchmark code to fit your target
+computer. In that case, please chose following sets of
+ (mimax,mjmax,mkmax):
+small : 33,33,65
+small : 65,65,129
+midium: 129,129,257
+large : 257,257,513
+ext.large: 513,513,1025
+This program is to measure a computer performance in MFLOPS
+by using a kernel which appears in a linear solver of pressure
+Poisson eq. which appears in an incompressible Navier-Stokes solver.
+A point-Jacobi method is employed in this solver as this method can 
+be easyly vectrized and be parallelized.
+    ------------------
+     Finite-difference method, curvilinear coodinate system
+     Vectorizable and parallelizable on each grid point
+     No. of grid points : imax x jmax x kmax including boundaries
+     ------------------
+A,B,C:coefficient matrix, wrk1: source term of Poisson equation
+wrk2 : working area, OMEGA : relaxation parameter
+BND:control variable for boundaries and objects ( = 0 or 1)
+P: pressure (this array is checkpointed)
 
-
-HOW to Build & Install
+HOW to Build & Install & Run
 ------------
 Run commands below:   
 
-    $ ./configure --prefix=/path/to/install/dir
-    $ make 
-    $ make install
-
-
-
-Quick Start
--------------
-### Build examples ###
-
-Run commands below:  
-  
-    $ cd /path/to/install/dir
-    $ cd examples
-
-
-Edit makefile (examples/makefile):  
-
-    INSTALL_DIR = /path/to/install/dir
-
-
-Make:  
-
+    $ ./paramset.sh <Grid size> <X> <Y> <Z> <Checkpoint dir>
     $ make
 
-### Run example 1: Simple communication ###
-The example codes simply exchanges messages (Ping-Pong) initiated by a client side
+* `<Grid size>`           : XS (32x32x64), S  (64x64x128), M  (128x128x256), L  (256x256x512), XL (512x512x1024)
+* `<X> <Y> <Z>`           : Partition size
+* `Checkpoint dir` [input]: Path to Checkpoint/Restart directory
 
-Run server code:  
-
-    sierra0$ ./example_server
-
-
-Run client cond:  
-
-    sierra1$ ./example_client sierra0
-
-
-
-### Run example 2: RDMA I/O  ###
-The client example code wirte/read a spedified file on the remote server.
-
-Run server code:  
-
-    sierra0$ ./ibio_server
-
-
-Run client code:  
-
-    sierra1$ ./ibio_test sierra0:/path/to/file 0 # write
-    sierra1$ ./ibio_test sierra0:/path/to/file 1 # read
-
-
-
-RDMA Communication APIs & Variables
------------------------
-### APIs
-
-#### Initialization
-    int fdmi_verbs_init(int *argc, char ***argv)  
-This function must be called before any communication functions  
-
-* `argc` [input]: Pointer to the number of arguments  
-* `argv` [input]: Argument vector  
-    
-#### Finalization
-    int fdmi_verbs_finalize()  
-This function finalize the communications
-
-#### Connection (Used by only clients )
-    void fdmi_connection* fdmi_verbs_connect(int id, char *hostname);
-This function make connection to a specified server, create mapping from `id` to `hostname`.
-`id` is used by the rest of communication function calls (send/redv).
-
-* `id` [input]: integer to assinge the host
-* `hostname` [input]: a server to connect
-    
-#### Non-blocking Send
-    int fdmi_verbs_isend (const void* buf, int count, struct fdmi_datatype dataype, int dest, int tag, struct fdmi_communicator *comm, struct fdmi_request* request);
-This function provides non-blocking send.
-
-* `buf` [input]: Initial address of send buffer
-* `count` [input]: Number of elements in send buffer
-* `datatype` [input]: Datatype of each send buffer element
-* `dest` [input]: `id` of destination (Assigned `id` via fmdi_verbs_connection)
-* `tag` [input]: Message tag
-* `comm` [input]: Communicator (Must specify FMI_COMM_WORLD)
-* `request` [output]: Communication request
-
-#### Non-blocking Recv
-    int fdmi_verbs_irecv(const void* buf, int count, struct fdmi_datatype dataype,  int source, int tag, struct fdmi_communicator *comm, struct fdmi_request* request);
-This function provides non-blocking receive.
-
-* `buf` [input]: Initial address of receive buffer
-* `count` [input]: Number of elements in receive buffer
-* `datatype` [input]: Datatype of each receive buffer element
-* `source` [input]: `id` of source (Assigned `id` via fmdi_verbs_connection)
-* `tag` [input]: Message tag
-* `comm` [input]: Communicator (Must specify FMI_COMM_WORLD)
-* `request` [output]: Communication request
-
-#### Test    
-    int fdmi_verbs_test(struct fdmi_request *request, struct fdmi_status *staus);
-This function returns 1 if the send/recv operation identified by `request` is complete. Otherwise, this function returns 0.
-
-* `request` [input]: Communication request
-* `status` [output]: Status object
-
-#### Wait
-    int fdmi_verbs_wait(struct fdmi_request* request, struct fdmi_status *status);
-This function is blocking fdmi_verbs_test.
-This function returns 1 if the send/recv operation identified by `request` is complete. Otherwise, this function blocks the call until the request gets complete.
-  
-* `request` [input]: Communication request
-* `status` [output]: Status object
-
-#### Iprove
-    int fdmi_verbs_iprobe(int source, int tag, struct fdmi_communicator* comm, int *flag, struct fdmi_status *status);
-This function allows checkpoint of incoming messages without actual receipt of them.
-The user can then decide how to receive them, based on the information returned by this function.
-This function returns `flag`=1 if messages with `source` and `tag` is ready to receive, then put the information to `status`. Otherwise this function just returns `flag`=0.
-
-* `source` [input]: Source `id ` or FMI_ANY_SOURCE
-* `tag` [input]: Tag value or FMI_ANY_TAG
-* `comm` [input]: Communicator (Must specify FMI_COMM_WORLD)
-* `flag` [output]: Message-waiting flag
-* `status` [output]: Status object
-
-### Variables
-#### Datatype
-* FMI_INT: int
-* FMI_DOUBLE: double
-* FMI_FLOAT: float
-* FMI_BYTE: like unsigned char
-* FMI_CHAR: char
-
-#### Status
-    FMI_Status
-* FMI_SOURCE: `id` of processes sending the message    
-* FMI_TAG:`tag` of the message
-
+    $  mpirun -np * ./bmt <Restart #> <Checkpoint interval (steps)>
+* `Restart #`:  Checkpiont id at which bmt starts. 0 indicates run without restart
+* `Checkpoint interval (steps)`: # of Steps to skip checkpointing . 0 indicates no checkpoints.
 
 Example
--------
-
-Ping-Pong examples initiated by a client
-
-### Server side
-
-    FMI_Request req;
-    FMI_Status stat;
-    int flag;
-    char buff[256];
-
-    fdmi_verbs_init(&argc, &argv);
-
-
-    while (1) {
-      fdmi_verbs_iprobe(FMI_ANY_SOURCE, FMI_ANY_TAG, FMI_COMM_WORLD, &flag, &stat);
-      /** 
-       * After the initiation, a server assinge unique id to each client  when the clients connected
-       * The assigned id can be accessed through FMI_status (i.e. stat.FMI_SOURCE).
-       */
-      if (flag) {
-        fprintf(stderr, "Receved message: source=%d , tag=%d\n", stat.FMI_SOURCE, stat.FMI_TAG);
-
-        fdmi_verbs_irecv(buff, sizeof(buff), FMI_BYTE, stat.FMI_SOURCE, stat.FMI_TAG, FMI_COMM_WORLD, &req);
-        fdmi_verbs_wait(&req, NULL);
-        fprintf(stderr, "               : hostname=%s, assigned_id=%d\n", buff, stat.FMI_SOURCE);
-
-        sprintf(buff, "%d", stat.FMI_SOURCE);
-
-        fdmi_verbs_isend(buff, 1, FMI_INT, stat.FMI_SOURCE, stat.FMI_TAG, FMI_COMM_WORLD, &req);
-        fdmi_verbs_wait(&req, NULL);   
-        fprintf(stderr, "Send    message: destination_id(assigned_id)=%d\n",  stat.FMI_SOURCE);
-    }
-
-### Client side
-
-    FMI_Request req;
-    FMI_Status stat;
-
-    char server_hostname[256];
-    char buff[256];
-    int  server_hostid = 0;
-    int  tag = 5;
+-------------
+Run commands below:  
   
-    if (argc != 2) {
-      fdmi_err("example_client <server_hostname>");
-    }
-    sprintf(server_hostname, "%s", argv[1]);
-  
-    /* Initialization */
-    fdmi_verbs_init(&argc, &argv);
-
-    /**
-     *  Connect to a server(server_hostname).
-     *  Now I can exchange messages via id (server_hostid) 
-     *  Note:
-     *     Any server_hostid can be assigned to server_hostname.
-     *     But the server_hostid must be a unique number amoung servers.
-     */
-    fdmi_verbs_connect(server_hostid, server_hostname); /*Mapping: server_hostid -> server_hostname*/
-    printf("Connected: server_hostname=%s, server_hostid=%d\n", server_hostname, server_hostid);
-
-    gethostname(buff, sizeof(buff));
-  
-    /* Send my hostname to the connected server*/
-    fdmi_verbs_isend(buff, sizeof(buff), FMI_BYTE, server_hostid, tag, FMI_COMM_WORLD, &req);
-    fdmi_verbs_wait(&req, &stat);
-    printf("Send    : msg=%s\n", buff);
-
-    /* Receive assigned id by the connected server */
-    fdmi_verbs_irecv(buff, 1, FMI_INT, server_hostid, FMI_ANY_TAG, FMI_COMM_WORLD, &req);
-    fdmi_verbs_wait(&req, &stat);
-    printf("Recv    : assigned_id=%s\n", buff);
-  
-    fdmi_verbs_finalize();
+    $ ./paramset.sh M 1 1 2 /path/to/checkpoint/restart/dir
+    $ make
+    $ mpirun -np 2 ./bmt 0 100 
+    $ mpirun -np 2 ./bmt 1000 100 #restart from step 1000

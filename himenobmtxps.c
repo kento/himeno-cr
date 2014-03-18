@@ -223,11 +223,13 @@ void restart(int restart_id)
   hime_close(cfile, cfd);
   MPI_Barrier(MPI_COMM_WORLD);
   hime_dbgi(0, "Restart end  : restart_id = %d", restart_id);
+  return;
 }
 
 
 void checkpoint(int step)
 {
+  if (interval == 0) return;
   if (step % interval == 0) {
     sprintf(cfile, "%s/checkpoint.%d.%d", CHECKPOINT_DIR, id, step);
     cfd = hime_open(cfile, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -237,6 +239,7 @@ void checkpoint(int step)
     MPI_Barrier(MPI_COMM_WORLD);
     hime_dbgi(0, "Checkpoint end  : step = %d", step);
   }
+  return;
 }
 
 double
